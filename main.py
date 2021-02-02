@@ -35,8 +35,6 @@ def main():
     os.makedirs(path, exist_ok=True)
     pypandoc.convert_text(text, 'fb2', format='md', outputfile=str((path / f'{title}.fb2').resolve()))
     pypandoc.convert_text
-    #with open(path / f'{title}.txt', 'w') as f:
-    #    print(text, file=f)
 
 
 if __name__ == '__main__':
