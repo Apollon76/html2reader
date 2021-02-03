@@ -31,10 +31,9 @@ def main():
     tree = fromstring(response.content)
     title = slugify(tree.findtext('.//title'))
     text = html2text.html2text(response.text)
-    path = Path('/home/apollon/Dropbox/Приложения/Dropbox PocketBook/Web converted')
+    path = Path('./results')
     os.makedirs(path, exist_ok=True)
     pypandoc.convert_text(text, 'fb2', format='md', outputfile=str((path / f'{title}.fb2').resolve()))
-    pypandoc.convert_text
 
 
 if __name__ == '__main__':
