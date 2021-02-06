@@ -76,12 +76,13 @@ class Updater:
                     article = Article.parse_obj(value)
                     if article.id in self._processed:
                         continue
+                    logger.info('Processing article %s', article)
                     try:
                         process(article)
                         self._processed.add(article.id)
-                        logger.info(f'article=%s was processed', article)
+                        logger.info('article=%s was processed', article)
                     except ConversionError as e:
-                        print(e)
+                        logger.exception(e)
                 offset += len(data)
             time.sleep(10)
 
