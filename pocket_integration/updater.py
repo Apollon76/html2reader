@@ -49,7 +49,8 @@ def process(article: Article) -> None:
     tree = fromstring(response.content)
     title = slugify(tree.findtext('.//title'))
     text = html2text.html2text(response.text)
-    path = Path('./results')
+    # path = Path('./results')
+    path = Path('/home/apollon/Dropbox/Приложения/Dropbox PocketBook/Web converted')
     os.makedirs(path, exist_ok=True)
     try:
         pypandoc.convert_text(text, 'fb2', format='md', outputfile=str((path / f'{title}.fb2').resolve()))
@@ -92,7 +93,7 @@ class Updater:
                     except ConversionError as e:
                         logger.exception(e)
                 offset += len(data)
-            time.sleep(10)
+            time.sleep(30)
 
 
 if __name__ == '__main__':
