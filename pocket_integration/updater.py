@@ -9,6 +9,7 @@ import html2text
 import pypandoc
 import requests
 from pocket import Pocket, PocketException
+from pony.orm import Database, Required, PrimaryKey, db_session, select, exists, delete
 from pydantic import BaseModel, Field
 from lxml.html import fromstring
 from requests import HTTPError
@@ -38,7 +39,7 @@ class Article(BaseModel):
     resolved_url: str
     given_url: str
 
-def process(article: Article):
+def process(article: Article) -> None:
     headers = {'headers': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:51.0) Gecko/20100101 Firefox/51.0'}
     try:
         response = requests.get(article.given_url, headers=headers)
@@ -56,10 +57,15 @@ def process(article: Article):
         raise ConversionError from e
 
 
+db = Database()
+
+class DbArticle(db.Entity):
+    id = PrimaryKey(int, auto=True)
+    pocket_id = Required(str, unique=True, index=True)
+
 class Updater:
     def __init__(self, client: Pocket):
         self._client = client
-        self._processed = set()
 
     def run(self) -> None:
         while True:
@@ -74,12 +80,14 @@ class Updater:
                     break
                 for _, value in data.items():
                     article = Article.parse_obj(value)
-                    if article.id in self._processed:
-                        continue
+                    with db_session:
+                        if exists(e for e in DbArticle if e.pocket_id == article.id):
+                            continue
                     logger.info('Processing article %s', article)
                     try:
                         process(article)
-                        self._processed.add(article.id)
+                        with db_session:
+                            DbArticle(pocket_id=article.id)
                         logger.info('article=%s was processed', article)
                     except ConversionError as e:
                         logger.exception(e)
@@ -88,6 +96,13 @@ class Updater:
 
 
 if __name__ == '__main__':
+    db.bind(provider='sqlite', filename='database.sqlite', create_db=True)
+    db.generate_mapping(create_tables=True)
+    # with db_session:
+    #     for e in select(e for e in DbArticle):
+    #         print(e.pocket_id)
+    # exit(0)
+
     consumer_key = os.environ['CONSUMER_KEY']
     access_token = os.environ['ACCESS_TOKEN']
 
