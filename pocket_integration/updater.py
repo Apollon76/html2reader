@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import time
@@ -11,6 +12,12 @@ from pocket import Pocket, PocketException
 from pydantic import BaseModel, Field
 from lxml.html import fromstring
 from requests import HTTPError
+
+
+logger = logging.getLogger(__name__)
+
+class ConversionError(Exception):
+    pass
 
 
 def slugify(value: str):
@@ -33,14 +40,20 @@ class Article(BaseModel):
 
 def process(article: Article):
     headers = {'headers': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:51.0) Gecko/20100101 Firefox/51.0'}
-    response = requests.get(article.given_url, headers=headers)
-    response.raise_for_status()
+    try:
+        response = requests.get(article.given_url, headers=headers)
+        response.raise_for_status()
+    except HTTPError as e:
+        raise ConversionError from e
     tree = fromstring(response.content)
     title = slugify(tree.findtext('.//title'))
     text = html2text.html2text(response.text)
     path = Path('./results')
     os.makedirs(path, exist_ok=True)
-    pypandoc.convert_text(text, 'fb2', format='md', outputfile=str((path / f'{title}.fb2').resolve()))
+    try:
+        pypandoc.convert_text(text, 'fb2', format='md', outputfile=str((path / f'{title}.fb2').resolve()))
+    except RuntimeError as e:
+        raise ConversionError from e
 
 
 class Updater:
@@ -50,25 +63,26 @@ class Updater:
 
     def run(self) -> None:
         while True:
-            try:
-                offset = 0
-                while True:
+            offset = 0
+            while True:
+                try:
                     data = self._client.retrieve(offset=offset, count=10)['list']
-                    if not data:
-                        break
-                    for _, value in data.items():
-                        article = Article.parse_obj(value)
-                        if article.id in self._processed:
-                            continue
-                        try:
-                            process(article)
-                            self._processed.add(article.id)
-                            print(f'{article=} is processed')
-                        except HTTPError as e:
-                            print(e)
-                    offset += len(data)
-            except PocketException as e:
-                print(e.message)
+                except PocketException as e:
+                    logger.exception(e)
+                    break
+                if not data:
+                    break
+                for _, value in data.items():
+                    article = Article.parse_obj(value)
+                    if article.id in self._processed:
+                        continue
+                    try:
+                        process(article)
+                        self._processed.add(article.id)
+                        logger.info(f'article=%s was processed', article)
+                    except ConversionError as e:
+                        print(e)
+                offset += len(data)
             time.sleep(10)
 
 
