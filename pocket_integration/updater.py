@@ -51,8 +51,9 @@ class Updater:
     def run(self) -> None:
         while True:
             try:
+                offset = 0
                 while True:
-                    data = self._client.retrieve(offset=0, count=10)['list']
+                    data = self._client.retrieve(offset=offset, count=10)['list']
                     if not data:
                         break
                     for _, value in data.items():
@@ -65,6 +66,7 @@ class Updater:
                             print(f'{article=} is processed')
                         except HTTPError as e:
                             print(e)
+                    offset += len(data)
             except PocketException as e:
                 print(e.message)
             time.sleep(10)
