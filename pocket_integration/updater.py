@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import re
@@ -48,10 +49,11 @@ class DbArticle(db.Entity):
     pocket_id = Required(str, unique=True, index=True)
 
 class Updater:
-    def __init__(self, pocket_client: Pocket, dropbox_client: dropbox.Dropbox, path: Path):
+    def __init__(self, pocket_client: Pocket, dropbox_client: dropbox.Dropbox, path: Path, interval: datetime.timedelta):
         self._pocket_client = pocket_client
         self._dropbox_client = dropbox_client
         self._path = path
+        self._interval = interval
 
     def run(self) -> None:
         while True:
@@ -78,7 +80,7 @@ class Updater:
                     except ConversionError as e:
                         logger.exception(e)
                 offset += len(data)
-            time.sleep(30)
+            time.sleep(self._interval.total_seconds())
 
     def _process(self, article: Article) -> None:
         headers = {'headers': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:51.0) Gecko/20100101 Firefox/51.0'}

@@ -5,3 +5,15 @@ services:
     image: html2reader
     build:
       context: .
+    environment:
+      - DROPBOX_FILE_PATH=${DROPBOX_FILE_PATH}
+      - POCKET_CONSUMER_KEY=${POCKET_CONSUMER_KEY}
+      - POCKET_ACCESS_TOKEN=${POCKET_ACCESS_TOKEN}
+      - DROPBOX_ACCESS_TOKEN=${DROPBOX_ACCESS_TOKEN}
+    volumes:
+    - type: bind
+      source: ./results
+      target: /app/results
+    - type: bind
+      source: ./database
+      target: /app/database
