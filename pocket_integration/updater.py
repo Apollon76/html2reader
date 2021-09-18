@@ -51,6 +51,12 @@ class DbArticle(db.Entity):
     pocket_id = Required(str, unique=True, index=True)
 
 
+class DbAttempt(db.Entity):
+    id = PrimaryKey(int, auto=True)
+    pocket_id = Required(str, unique=True, index=True)
+    number = Required(int, sql_default=0)
+
+
 class Updater:
     def __init__(
         self,
@@ -82,6 +88,16 @@ class Updater:
                             continue
                     logger.info("Processing article %s", article)
                     try:
+                        with db_session:
+                            if exists(
+                                e for e in DbAttempt if e.pocket_id == article.id
+                            ):
+                                attempt = DbAttempt.get(pocket_id=article.id)
+                                if attempt.number >= 3:
+                                    continue
+                                attempt.number += 1
+                            else:
+                                DbAttempt(pocket_id=article.id, number=1)
                         self._process(article)
                         with db_session:
                             DbArticle(pocket_id=article.id)
