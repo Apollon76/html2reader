@@ -9,7 +9,7 @@ from pocket_integration.updater import db, Updater
 
 
 def main():
-    db.bind(provider='sqlite', filename='database/database.sqlite', create_db=True)
+    db.bind(provider="sqlite", filename="database/database.sqlite", create_db=True)
     db.generate_mapping(create_tables=True)
     # with db_session:
     #     for e in select(e for e in DbArticle):
@@ -25,11 +25,17 @@ def main():
     pocket_settings = PocketSettings()
     pocket_client = Pocket(
         consumer_key=pocket_settings.consumer_key,
-        access_token=pocket_settings.access_token
+        access_token=pocket_settings.access_token,
     )
     dropbox_settings = DropboxSettings()
     dropbox_client = dropbox.Dropbox(dropbox_settings.access_token)
-    Updater(pocket_client, dropbox_client=dropbox_client, path=Path(dropbox_settings.file_path), interval=datetime.timedelta(seconds=30)).run()
+    Updater(
+        pocket_client,
+        dropbox_client=dropbox_client,
+        path=Path(dropbox_settings.file_path),
+        interval=datetime.timedelta(seconds=30),
+    ).run()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

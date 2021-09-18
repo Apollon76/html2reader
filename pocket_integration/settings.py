@@ -6,7 +6,7 @@ class PocketSettings(BaseSettings):
     access_token: str
 
     class Config:
-        env_prefix = 'POCKET_'
+        env_prefix = "POCKET_"
 
 
 class DropboxSettings(BaseSettings):
@@ -14,4 +14,4 @@ class DropboxSettings(BaseSettings):
     file_path: str
 
     class Config:
-        env_prefix = 'DROPBOX_'
+        env_prefix = "DROPBOX_"
