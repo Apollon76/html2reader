@@ -1,4 +1,5 @@
 import datetime
+import logging
 from pathlib import Path
 
 import dropbox
@@ -9,6 +10,8 @@ from pocket_integration.updater import db, Updater
 
 
 def main():
+    logging.basicConfig(level=logging.INFO)
+
     db.bind(provider="sqlite", filename="database/database.sqlite", create_db=True)
     db.generate_mapping(create_tables=True)
     # with db_session:

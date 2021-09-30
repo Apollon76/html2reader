@@ -118,6 +118,7 @@ class Updater:
             raise ConversionError from e
         tree = fromstring(response.content)
         title = slugify(tree.findtext(".//title"))[:30]
+        logger.info('Title: %s', title)
         text = html2text.html2text(response.text)
         local_path = Path("./results")
         os.makedirs(local_path, exist_ok=True)
