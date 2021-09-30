@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import re
+import subprocess
 import time
 import unicodedata
 from pathlib import Path
@@ -9,13 +10,12 @@ from pathlib import Path
 import dropbox
 import dropbox.exceptions
 import html2text
-import pypandoc
 import requests
 from lxml.html import fromstring
 from pocket import Pocket, PocketException
 from pony.orm import Database, Required, PrimaryKey, db_session, exists
 from pydantic import BaseModel, Field
-from requests import HTTPError
+from requests import HTTPError, RequestException
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +114,7 @@ class Updater:
         try:
             response = requests.get(article.given_url, headers=headers)
             response.raise_for_status()
-        except HTTPError as e:
+        except (HTTPError, RequestException, requests.ConnectionError) as e:
             raise ConversionError from e
         tree = fromstring(response.content)
         title = slugify(tree.findtext(".//title"))[:30]
@@ -122,10 +122,18 @@ class Updater:
         local_path = Path("./results")
         os.makedirs(local_path, exist_ok=True)
         file_name = f"{title}.fb2"
+        md_file = str((local_path / f"{title}.md").resolve())
+        with open(md_file, 'w') as f:
+            f.write(text)
         local_file = str((local_path / file_name).resolve())
         try:
-            pypandoc.convert_text(text, "fb2", format="md", outputfile=local_file)
-        except RuntimeError as e:
+            result = subprocess.run(
+                ['ebook-convert', md_file, local_file, f'--title={title}'],
+                stdout=subprocess.DEVNULL,
+            )
+            if result.returncode != 0:
+                raise ConversionError(f'Calibre returned code {result.returncode}')
+        except subprocess.SubprocessError as e:
             raise ConversionError from e
         with open(local_file, "rb") as f:
             try:
