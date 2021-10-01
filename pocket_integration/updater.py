@@ -117,7 +117,7 @@ class Updater:
         except (HTTPError, RequestException, requests.ConnectionError) as e:
             raise ConversionError from e
         tree = fromstring(response.content)
-        title = slugify(tree.findtext(".//title"))[:30]
+        title = slugify(tree.findtext(".//title", str(article.id)))[:30]
         logger.info('Title: %s', title)
         text = html2text.html2text(response.text)
         local_path = Path("./results")
