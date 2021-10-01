@@ -8,6 +8,8 @@ from pocket import Pocket
 from pocket_integration.settings import PocketSettings, DropboxSettings
 from pocket_integration.updater import db, Updater
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     logging.basicConfig(level=logging.INFO)
@@ -32,12 +34,17 @@ def main():
     )
     dropbox_settings = DropboxSettings()
     dropbox_client = dropbox.Dropbox(dropbox_settings.access_token)
-    Updater(
-        pocket_client,
-        dropbox_client=dropbox_client,
-        path=Path(dropbox_settings.file_path),
-        interval=datetime.timedelta(seconds=30),
-    ).run()
+    try:
+        Updater(
+            pocket_client,
+            dropbox_client=dropbox_client,
+            path=Path(dropbox_settings.file_path),
+            interval=datetime.timedelta(seconds=30),
+        ).run()
+    except Exception as e:
+        logging.basicConfig(filename='err.log', level=logging.DEBUG)
+        logger.exception(e)
+        raise
 
 
 if __name__ == "__main__":
