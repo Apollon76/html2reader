@@ -42,7 +42,8 @@ def main():
             interval=datetime.timedelta(seconds=30),
         ).run()
     except Exception as e:
-        logging.basicConfig(filename='err.log', level=logging.DEBUG)
+        file_handler = logging.FileHandler('err.log', 'a')
+        logger.addHandler(file_handler)
         logger.exception(e)
         raise
 
