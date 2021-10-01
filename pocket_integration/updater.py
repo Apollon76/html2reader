@@ -116,7 +116,10 @@ class Updater:
             response.raise_for_status()
         except (HTTPError, RequestException, requests.ConnectionError) as e:
             raise ConversionError from e
-        tree = fromstring(response.content)
+        try:
+            tree = fromstring(response.content)
+        except Exception as e:
+            raise ConversionError from e
         title = slugify(tree.findtext(".//title", str(article.id)))[:30]
         logger.info('Title: %s', title)
         text = html2text.html2text(response.text)
