@@ -86,18 +86,19 @@ class Updater:
                     with db_session:
                         if exists(e for e in DbArticle if e.pocket_id == article.id):
                             continue
+                    with db_session:
+                        if exists(
+                                e for e in DbAttempt if e.pocket_id == article.id
+                        ):
+                            attempt = DbAttempt.get(pocket_id=article.id)
+                            if attempt.number >= 3:
+                                continue
+                            attempt.number += 1
+                        else:
+                            DbAttempt(pocket_id=article.id, number=1)
+
                     logger.info("Processing article %s", article)
                     try:
-                        with db_session:
-                            if exists(
-                                e for e in DbAttempt if e.pocket_id == article.id
-                            ):
-                                attempt = DbAttempt.get(pocket_id=article.id)
-                                if attempt.number >= 3:
-                                    continue
-                                attempt.number += 1
-                            else:
-                                DbAttempt(pocket_id=article.id, number=1)
                         self._process(article)
                         with db_session:
                             DbArticle(pocket_id=article.id)
