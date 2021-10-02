@@ -76,7 +76,7 @@ class Updater:
             while True:
                 try:
                     data = self._pocket_client.retrieve(offset=offset, count=10)["list"]
-                except PocketException as e:
+                except (PocketException, HTTPError, RequestException, requests.ConnectionError) as e:
                     logger.exception(e)
                     break
                 if not data:
