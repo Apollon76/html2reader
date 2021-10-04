@@ -12,7 +12,7 @@ import dropbox.exceptions
 import html2text
 import requests
 from lxml.html import fromstring
-from pocket import Pocket, PocketException
+from pocket import Pocket
 from pony.orm import Database, Required, PrimaryKey, db_session, exists
 from pydantic import BaseModel, Field
 from requests import HTTPError, RequestException
@@ -39,7 +39,6 @@ def slugify(value: str):
 
 class Article(BaseModel):
     id: str = Field(alias="item_id")
-    resolved_url: str
     given_url: str
 
 
