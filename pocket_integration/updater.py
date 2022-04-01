@@ -117,7 +117,7 @@ class Updater:
         except (HTTPError, RequestException, requests.ConnectionError) as e:
             raise ConversionError from e
         try:
-            tree = fromstring(response.content)
+            tree = fromstring(response.text)
         except Exception as e:
             raise ConversionError from e
         title = slugify(tree.findtext(".//title", str(article.id)))[:30]
