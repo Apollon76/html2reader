@@ -13,7 +13,7 @@ import html2text
 import requests
 from lxml.html import fromstring
 from pocket import Pocket
-from pony.orm import Database, Required, PrimaryKey, db_session, exists
+from pony.orm import Database, PrimaryKey, Required, db_session, exists
 from pydantic import BaseModel, Field
 from requests import HTTPError, RequestException
 
@@ -24,7 +24,7 @@ class ConversionError(Exception):
     pass
 
 
-def slugify(value: str):
+def slugify(value: str) -> str:
     """
     Taken from https://github.com/django/django/blob/master/django/utils/text.py
     Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
@@ -45,12 +45,12 @@ class Article(BaseModel):
 db = Database()
 
 
-class DbArticle(db.Entity):
+class DbArticle(db.Entity):  # type: ignore
     id = PrimaryKey(int, auto=True)
     pocket_id = Required(str, unique=True, index=True)
 
 
-class DbAttempt(db.Entity):
+class DbAttempt(db.Entity):  # type: ignore
     id = PrimaryKey(int, auto=True)
     pocket_id = Required(str, unique=True, index=True)
     number = Required(int, sql_default=0)
@@ -75,20 +75,18 @@ class Updater:
             while True:
                 try:
                     data = self._pocket_client.retrieve(offset=offset, count=10)["list"]
-                except Exception as e:
-                    logger.exception(e)
+                except Exception:
+                    logger.exception("Can not load data from Pocket")
                     break
                 if not data:
                     break
                 for _, value in data.items():
                     article = Article.parse_obj(value)
                     with db_session:
-                        if exists(e for e in DbArticle if e.pocket_id == article.id):
+                        if exists(e for e in DbArticle if e.pocket_id == article.id):  # type: ignore
                             continue
                     with db_session:
-                        if exists(
-                                e for e in DbAttempt if e.pocket_id == article.id
-                        ):
+                        if exists(e for e in DbAttempt if e.pocket_id == article.id):  # type: ignore
                             attempt = DbAttempt.get(pocket_id=article.id)
                             if attempt.number >= 3:
                                 continue
@@ -102,15 +100,13 @@ class Updater:
                         with db_session:
                             DbArticle(pocket_id=article.id)
                         logger.info("article=%s was processed", article)
-                    except ConversionError as e:
-                        logger.exception(e)
+                    except ConversionError:
+                        logger.exception("Didn't convert article %s", article.id)
                 offset += len(data)
             time.sleep(self._interval.total_seconds())
 
     def _process(self, article: Article) -> None:
-        headers = {
-            "headers": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:51.0) Gecko/20100101 Firefox/51.0"
-        }
+        headers = {"headers": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:51.0) Gecko/20100101 Firefox/51.0"}
         try:
             response = requests.get(article.given_url, headers=headers)
             response.raise_for_status()
@@ -139,10 +135,8 @@ class Updater:
                 raise ConversionError(f'Calibre returned code {result.returncode}')
         except subprocess.SubprocessError as e:
             raise ConversionError from e
-        with open(local_file, "rb") as f:
+        with open(local_file, "rb") as file_output:
             try:
-                self._dropbox_client.files_upload(
-                    f.read(), str((self._path / file_name).resolve())
-                )
+                self._dropbox_client.files_upload(file_output.read(), str((self._path / file_name).resolve()))
             except dropbox.exceptions.DropboxException as e:
                 raise ConversionError from e
