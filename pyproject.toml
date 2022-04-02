@@ -7,6 +7,11 @@ authors = ["Apollon76 <devcpy@mail.ru>"]
 [tool.poetry.dependencies]
 python = "^3.9"
 pydantic = "^1.9.0"
+dropbox = "^11.29.0"
+html2text = "^2020.1.16"
+lxml = "^4.8.0"
+pocket-api = "^0.1.5"
+pony = "^0.7.16"
 
 [tool.poetry.dev-dependencies]
 black = ">19.3b0"
