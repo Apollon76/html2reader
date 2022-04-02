@@ -5,8 +5,8 @@ from pathlib import Path
 import dropbox
 from pocket import Pocket
 
-from pocket_integration.settings import PocketSettings, DropboxSettings
-from pocket_integration.updater import db, Updater
+from html2reader.settings import PocketSettings, DropboxSettings
+from html2reader.updater import db, Updater
 
 logger = logging.getLogger(__name__)
 
