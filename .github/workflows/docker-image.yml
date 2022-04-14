@@ -13,8 +13,13 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
+    - name: Set output variables
+      id: vars
+      run: |
+        echo ::set-output name=tag::"$(date +%s)"
+    
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag apollon76/html2reader:$(date +%s)
+      run: docker build . --file Dockerfile --tag apollon76/html2reader:${{ steps.vars.outputs.tag }}
     
     - name: Login
       env:
@@ -22,4 +27,4 @@ jobs:
       run: docker login -u apollon76 -p "$DOCKER_HUB_PASSWORD"
       
     - name: Push
-      run: docker push apollon76/html2reader:$(date +%s)
+      run: docker push apollon76/html2reader:${{ steps.vars.outputs.tag }}
