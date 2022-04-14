@@ -10,7 +10,7 @@ RUN pip install pydantic
 RUN pip install pony
 
 ADD main.py .
-ADD pocket_integration/* pocket_integration/
+ADD html2reader/* html2reader/
 
 RUN mkdir results
 RUN mkdir database
