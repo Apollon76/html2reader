@@ -19,7 +19,7 @@ jobs:
         echo ::set-output name=tag::"$(date +%s)"
     
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag apollon76/html2reader:${{ steps.vars.outputs.tag }}
+      run: docker build . --file Dockerfile --tag apollon76/html2reader:${{ steps.vars.outputs.tag }} --tag apollon76/html2reader:latest
     
     - name: Login
       env:
