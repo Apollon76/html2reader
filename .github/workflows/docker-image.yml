@@ -27,4 +27,6 @@ jobs:
       run: docker login -u apollon76 -p "$DOCKER_HUB_PASSWORD"
       
     - name: Push
-      run: docker push apollon76/html2reader:${{ steps.vars.outputs.tag }} apollon76/html2reader:latest
+      run: |
+        docker push apollon76/html2reader:${{ steps.vars.outputs.tag }}
+        docker push apollon76/html2reader:latest
