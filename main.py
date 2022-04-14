@@ -16,10 +16,6 @@ def main():
 
     db.bind(provider="sqlite", filename="database/database.sqlite", create_db=True)
     db.generate_mapping(create_tables=True)
-    # with db_session:
-    #     for e in select(e for e in DbArticle):
-    #         print(e.pocket_id)
-    # exit(0)
 
     # response = requests.post(url='https://getpocket.com/v3/oauth/request', json={'consumer_key': consumer_key, 'redirect_uri': 'http://example.com'})
     # code = response.content.decode()[len('code='):]
