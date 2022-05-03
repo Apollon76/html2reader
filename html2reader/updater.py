@@ -1,90 +1,58 @@
 import datetime
 import logging
-import os
-import re
-import subprocess
 import time
-import unicodedata
 from pathlib import Path
+from typing import Iterator
 
 import dropbox
 import dropbox.exceptions
-import html2text
-import requests
-from lxml.html import fromstring
-from pocket import Pocket
-from pony.orm import Database, PrimaryKey, Required, db_session, exists
-from pydantic import BaseModel, Field
-from requests import HTTPError, RequestException
+from pony.orm import db_session, exists
+
+from html2reader.article_fetcher import Article, PocketFetcher
+from html2reader.converter import ConversionError, convert_to_fb2
+from html2reader.db import DbArticle, DbAttempt
 
 logger = logging.getLogger(__name__)
 
 
-class ConversionError(Exception):
+def filter_processed(articles: Iterator[Article]) -> Iterator[Article]:
+    for article in articles:
+        with db_session:
+            if exists(e for e in DbArticle if e.pocket_id == article.id):  # type: ignore
+                continue
+        yield article
+
+
+class UploadError(Exception):
     pass
 
 
-def slugify(value: str) -> str:
-    """
-    Taken from https://github.com/django/django/blob/master/django/utils/text.py
-    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
-    dashes to single dashes. Remove characters that aren't alphanumerics,
-    underscores, or hyphens. Convert to lowercase. Also strip leading and
-    trailing whitespace, dashes, and underscores.
-    """
-    value = unicodedata.normalize("NFKC", value)
-    value = re.sub(r"[^\w\s-]", "", value.lower())
-    return re.sub(r"[-\s]+", "-", value).strip("-_")
-
-
-class Article(BaseModel):
-    id: str = Field(alias="item_id")
-    given_url: str
-
-
-db = Database()
-
-
-class DbArticle(db.Entity):  # type: ignore
-    id = PrimaryKey(int, auto=True)
-    pocket_id = Required(str, unique=True, index=True)
-
-
-class DbAttempt(db.Entity):  # type: ignore
-    id = PrimaryKey(int, auto=True)
-    pocket_id = Required(str, unique=True, index=True)
-    number = Required(int, sql_default=0)
+def upload_to_dropbox(dropbox_client: dropbox.Dropbox, base_path: Path, local_file: Path) -> None:
+    file_name = local_file.name
+    with open(str(local_file), "rb") as file_output:
+        try:
+            dropbox_client.files_upload(file_output.read(), str((base_path / file_name).resolve()))
+        except dropbox.exceptions.DropboxException as e:
+            raise UploadError from e
 
 
 class Updater:
     def __init__(
         self,
-        pocket_client: Pocket,
+        pocket_fetcher: PocketFetcher,
         dropbox_client: dropbox.Dropbox,
         path: Path,
         interval: datetime.timedelta,
     ):
-        self._pocket_client = pocket_client
+        self._pocket_fetcher = pocket_fetcher
         self._dropbox_client = dropbox_client
         self._path = path
         self._interval = interval
 
     def run(self) -> None:
         while True:
-            offset = 0
-            while True:
-                try:
-                    data = self._pocket_client.retrieve(offset=offset, count=10)["list"]
-                except Exception:
-                    logger.exception("Can not load data from Pocket")
-                    break
-                if not data:
-                    break
-                for _, value in data.items():
-                    article = Article.parse_obj(value)
-                    with db_session:
-                        if exists(e for e in DbArticle if e.pocket_id == article.id):  # type: ignore
-                            continue
+            try:
+                for article in filter_processed(self._pocket_fetcher.fetch_all()):
                     with db_session:
                         if exists(e for e in DbAttempt if e.pocket_id == article.id):  # type: ignore
                             attempt = DbAttempt.get(pocket_id=article.id)
@@ -96,47 +64,19 @@ class Updater:
 
                     logger.info("Processing article %s", article)
                     try:
-                        self._process(article)
-                        with db_session:
-                            DbArticle(pocket_id=article.id)
-                        logger.info("article=%s was processed", article)
+                        local_file = convert_to_fb2(article=article)
                     except ConversionError:
                         logger.exception("Didn't convert article %s", article.id)
-                offset += len(data)
-            time.sleep(self._interval.total_seconds())
+                        continue
+                    try:
+                        upload_to_dropbox(self._dropbox_client, base_path=self._path, local_file=local_file)
+                    except UploadError:
+                        logger.exception("Failed to upload article %s", article.id)
+                        continue
+                    with db_session:
+                        DbArticle(pocket_id=article.id)
+                    logger.info("article %s was processed", article)
 
-    def _process(self, article: Article) -> None:
-        headers = {"headers": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:51.0) Gecko/20100101 Firefox/51.0"}
-        try:
-            response = requests.get(article.given_url, headers=headers)
-            response.raise_for_status()
-        except (HTTPError, RequestException, requests.ConnectionError) as e:
-            raise ConversionError from e
-        try:
-            tree = fromstring(response.text)
-        except Exception as e:
-            raise ConversionError from e
-        title = slugify(tree.findtext(".//title", str(article.id)))[:30]
-        logger.info('Title: %s', title)
-        text = html2text.html2text(response.text)
-        local_path = Path("./results")
-        os.makedirs(local_path, exist_ok=True)
-        file_name = f"{title}.fb2"
-        md_file = str((local_path / f"{title}.md").resolve())
-        with open(md_file, 'w') as f:
-            f.write(text)
-        local_file = str((local_path / file_name).resolve())
-        try:
-            result = subprocess.run(
-                ['ebook-convert', md_file, local_file, f'--title={title}'],
-                stdout=subprocess.DEVNULL,
-            )
-            if result.returncode != 0:
-                raise ConversionError(f'Calibre returned code {result.returncode}')
-        except subprocess.SubprocessError as e:
-            raise ConversionError from e
-        with open(local_file, "rb") as file_output:
-            try:
-                self._dropbox_client.files_upload(file_output.read(), str((self._path / file_name).resolve()))
-            except dropbox.exceptions.DropboxException as e:
-                raise ConversionError from e
+                time.sleep(self._interval.total_seconds())
+            except Exception:
+                logger.exception('Unexpected error')
