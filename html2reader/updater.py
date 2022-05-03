@@ -76,7 +76,7 @@ class Updater:
                     with db_session:
                         DbArticle(pocket_id=article.id)
                     logger.info("article %s was processed", article)
-
-                time.sleep(self._interval.total_seconds())
             except Exception:
                 logger.exception('Unexpected error')
+
+            time.sleep(self._interval.total_seconds())
