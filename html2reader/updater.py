@@ -6,6 +6,7 @@ import subprocess
 import time
 import unicodedata
 from pathlib import Path
+from typing import Iterator
 
 import dropbox
 import dropbox.exceptions
@@ -13,9 +14,11 @@ import html2text
 import requests
 from lxml.html import fromstring
 from pocket import Pocket
-from pony.orm import Database, PrimaryKey, Required, db_session, exists
+from pony.orm import db_session, exists
 from pydantic import BaseModel, Field
 from requests import HTTPError, RequestException
+
+from html2reader.db import DbArticle, DbAttempt
 
 logger = logging.getLogger(__name__)
 
@@ -42,28 +45,36 @@ class Article(BaseModel):
     given_url: str
 
 
-db = Database()
+class PocketFetcher:
+    def __init__(self, pocket_client: Pocket,):
+        self._pocket_client = pocket_client
 
+    def fetch_all(self) -> Iterator[Article]:
+        offset = 0
+        while True:
+            data = self._pocket_client.retrieve(offset=offset, count=10)["list"]
+            if not data:
+                break
+            for _, value in data.items():
+                yield Article.parse_obj(value)
+            offset += len(data)
 
-class DbArticle(db.Entity):  # type: ignore
-    id = PrimaryKey(int, auto=True)
-    pocket_id = Required(str, unique=True, index=True)
-
-
-class DbAttempt(db.Entity):  # type: ignore
-    id = PrimaryKey(int, auto=True)
-    pocket_id = Required(str, unique=True, index=True)
-    number = Required(int, sql_default=0)
-
+def filter_processed(articles: Iterator[Article]) -> Iterator[Article]:
+    for article in articles:
+        with db_session:
+            if exists(e for e in DbArticle if e.pocket_id == article.id):  # type: ignore
+                continue
+        yield article
 
 class Updater:
     def __init__(
         self,
-        pocket_client: Pocket,
+            pocket_fetcher: PocketFetcher,
         dropbox_client: dropbox.Dropbox,
         path: Path,
         interval: datetime.timedelta,
     ):
+        self._pocket_fetcher = pocket_fetcher
         self._pocket_client = pocket_client
         self._dropbox_client = dropbox_client
         self._path = path
@@ -71,38 +82,25 @@ class Updater:
 
     def run(self) -> None:
         while True:
-            offset = 0
-            while True:
-                try:
-                    data = self._pocket_client.retrieve(offset=offset, count=10)["list"]
-                except Exception:
-                    logger.exception("Can not load data from Pocket")
-                    break
-                if not data:
-                    break
-                for _, value in data.items():
-                    article = Article.parse_obj(value)
-                    with db_session:
-                        if exists(e for e in DbArticle if e.pocket_id == article.id):  # type: ignore
+            for article in filter_processed(self._pocket_fetcher.fetch_all()):
+                with db_session:
+                    if exists(e for e in DbAttempt if e.pocket_id == article.id):  # type: ignore
+                        attempt = DbAttempt.get(pocket_id=article.id)
+                        if attempt.number >= 3:
                             continue
-                    with db_session:
-                        if exists(e for e in DbAttempt if e.pocket_id == article.id):  # type: ignore
-                            attempt = DbAttempt.get(pocket_id=article.id)
-                            if attempt.number >= 3:
-                                continue
-                            attempt.number += 1
-                        else:
-                            DbAttempt(pocket_id=article.id, number=1)
+                        attempt.number += 1
+                    else:
+                        DbAttempt(pocket_id=article.id, number=1)
 
-                    logger.info("Processing article %s", article)
-                    try:
-                        self._process(article)
-                        with db_session:
-                            DbArticle(pocket_id=article.id)
-                        logger.info("article=%s was processed", article)
-                    except ConversionError:
-                        logger.exception("Didn't convert article %s", article.id)
-                offset += len(data)
+                logger.info("Processing article %s", article)
+                try:
+                    self._process(article)
+                    with db_session:
+                        DbArticle(pocket_id=article.id)
+                    logger.info("article=%s was processed", article)
+                except ConversionError:
+                    logger.exception("Didn't convert article %s", article.id)
+
             time.sleep(self._interval.total_seconds())
 
     def _process(self, article: Article) -> None:
