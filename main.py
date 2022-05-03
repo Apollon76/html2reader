@@ -6,7 +6,8 @@ import dropbox
 from pocket import Pocket
 
 from html2reader.settings import PocketSettings, DropboxSettings
-from html2reader.updater import Updater, PocketFetcher
+from html2reader.updater import Updater
+from html2reader.article_fetcher import PocketFetcher
 from html2reader.db import db
 
 logger = logging.getLogger(__name__)

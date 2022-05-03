@@ -1,6 +1,6 @@
 import pytest
 
-from html2reader.updater import slugify
+from html2reader.converter import slugify
 
 
 @pytest.mark.parametrize(('text', 'expected'), [('Привет. Как дела?', 'привет-как-дела')])
