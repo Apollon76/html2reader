@@ -6,7 +6,7 @@ import dropbox
 from pocket import Pocket
 
 from html2reader.settings import PocketSettings, DropboxSettings
-from html2reader.updater import Updater
+from html2reader.updater import Updater, PocketFetcher
 from html2reader.db import db
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ def main():
     dropbox_client = dropbox.Dropbox(dropbox_settings.access_token)
     try:
         Updater(
-            pocket_client,
+            pocket_fetcher=PocketFetcher(pocket_client=pocket_client),
             dropbox_client=dropbox_client,
             path=Path(dropbox_settings.file_path),
             interval=datetime.timedelta(seconds=30),

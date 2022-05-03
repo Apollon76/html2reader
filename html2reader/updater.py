@@ -46,7 +46,10 @@ class Article(BaseModel):
 
 
 class PocketFetcher:
-    def __init__(self, pocket_client: Pocket,):
+    def __init__(
+        self,
+        pocket_client: Pocket,
+    ):
         self._pocket_client = pocket_client
 
     def fetch_all(self) -> Iterator[Article]:
@@ -59,6 +62,7 @@ class PocketFetcher:
                 yield Article.parse_obj(value)
             offset += len(data)
 
+
 def filter_processed(articles: Iterator[Article]) -> Iterator[Article]:
     for article in articles:
         with db_session:
@@ -66,10 +70,11 @@ def filter_processed(articles: Iterator[Article]) -> Iterator[Article]:
                 continue
         yield article
 
+
 class Updater:
     def __init__(
         self,
-            pocket_fetcher: PocketFetcher,
+        pocket_fetcher: PocketFetcher,
         dropbox_client: dropbox.Dropbox,
         path: Path,
         interval: datetime.timedelta,
