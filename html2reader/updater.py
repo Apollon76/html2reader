@@ -65,12 +65,17 @@ class Updater:
                     logger.info("Processing article %s", article)
                     try:
                         local_file = convert_to_fb2(article=article)
-                        upload_to_dropbox(self._dropbox_client, base_path=self._path, local_file=local_file)
-                        with db_session:
-                            DbArticle(pocket_id=article.id)
-                        logger.info("article=%s was processed", article)
-                    except (ConversionError, UploadError):
+                    except ConversionError:
                         logger.exception("Didn't convert article %s", article.id)
+                        continue
+                    try:
+                        upload_to_dropbox(self._dropbox_client, base_path=self._path, local_file=local_file)
+                    except UploadError:
+                        logger.exception("Failed to upload article %s", article.id)
+                        continue
+                    with db_session:
+                        DbArticle(pocket_id=article.id)
+                    logger.info("article %s was processed", article)
 
                 time.sleep(self._interval.total_seconds())
             except Exception:
